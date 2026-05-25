@@ -1,109 +1,94 @@
 /*
- * COMPILAÇÃO: gcc produtor_consumidor_v1_1_consumidor.c -o pc_v1 -lpthread
- * * VERSÃO 1: Vários Produtores e 1 Consumidor.
- * Controle com Mutex para acesso ao vetor e Semáforos para contagem (vazio/cheio).
+ * COMPILAÇÃO: gcc leitores_escritores_v1_leitura_suja.c -o rw_v1 -lpthread
+ * * VERSÃO 1: Leitores e escritores sem "prioridade".
+ * Ocorre "Leitura Suja". Os escritores bloqueiam uns aos outros (para não corromper 
+ * totalmente os dados), mas os leitores NÃO usam bloqueio. Eles acessam os dados 
+ * enquanto os escritores estão no meio de uma transferência, causando leitura de dados inconsistentes.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include <unistd.h>
 
-#define TAM_BUFFER 5
-#define NUM_PRODUTORES 3
-#define NUM_CONSUMIDORES 1
-#define ITENS_POR_PRODUTOR 4
+#define NUM_LEITORES 5
+#define NUM_ESCRITORES 2
+#define NUM_OPERACOES 3
 
-int buffer[TAM_BUFFER];
-int in = 0, out = 0;
+// Variáveis Compartilhadas (O Banco)
+int contaA = 500;
+int contaB = 500;
+pthread_mutex_t mutex_escrita; // Apenas para organizar os escritores entre si
 
-// Primitivas de sincronização
-sem_t empty; // Vagas livres
-sem_t full;  // Vagas ocupadas
-pthread_mutex_t mutex_buffer;
-
-void imprimir_buffer() {
-    printf("BUFFER: [ ");
-    for(int i=0; i<TAM_BUFFER; i++) {
-        if(buffer[i] == 0) printf("- ");
-        else printf("%d ", buffer[i]);
-    }
-    printf("]\n");
-}
-
-void* produtor(void* arg) {
+void* escritor(void* arg) {
     int id = *((int*)arg);
-    for (int i = 0; i < ITENS_POR_PRODUTOR; i++) {
-        int item = (id * 100) + i; // Gera um dado (ex: produtor 2 gera 200, 201...)
+    for (int i = 0; i < NUM_OPERACOES; i++) {
+        int valor = (rand() % 100) + 1; // Valor aleatório para transferir
         
-        printf("[Produtor %d] Produziu o item %d. Dormindo/Aguardando vaga...\n", id, item);
+        printf("[Escritor %d] Criado e tentando entrar na RC...\n", id);
         
-        sem_wait(&empty); // Se buffer cheio, bloqueia aqui ("dorme")
-        pthread_mutex_lock(&mutex_buffer); // Entra RC
+        pthread_mutex_lock(&mutex_escrita); // Entra na Região Crítica
+        printf("[Escritor %d] Entrou na RC. Iniciando transferencia de %d da Conta A para B.\n", id, valor);
         
-        printf("[Produtor %d] Entrou na RC.\n", id);
-        buffer[in] = item;
-        in = (in + 1) % TAM_BUFFER;
-        imprimir_buffer();
-        printf("[Produtor %d] Saiu da RC.\n", id);
+        // Simula uma operação demorada para forçar a leitura suja
+        contaA -= valor;
+        usleep(100000); // Dorme por 100ms. AQUI OCORRE A INCONSISTÊNCIA!
+        contaB += valor;
         
-        pthread_mutex_unlock(&mutex_buffer); // Sai RC
-        sem_post(&full); // Avisa que tem novo item
+        printf("[Escritor %d] Transferencia concluida. (ContaA: %d, ContaB: %d, Total: %d). Saindo da RC.\n", 
+               id, contaA, contaB, contaA + contaB);
+        pthread_mutex_unlock(&mutex_escrita); // Sai da Região Crítica
         
-        usleep((rand() % 500) * 1000); // Atraso aleatório
+        sleep(1); // Espera antes da proxima transferencia
     }
+    printf("[Escritor %d] Finalizado.\n", id);
     pthread_exit(NULL);
 }
 
-void* consumidor(void* arg) {
+void* leitor(void* arg) {
     int id = *((int*)arg);
-    int total_consumir = NUM_PRODUTORES * ITENS_POR_PRODUTOR;
-    
-    for (int i = 0; i < total_consumir; i++) {
-        printf("[Consumidor %d] Aguardando item no buffer (Dormindo se vazio)...\n", id);
+    for (int i = 0; i < NUM_OPERACOES * 2; i++) {
+        printf("[Leitor %d] Lendo dados (SEM BLOQUEIO)...\n", id);
         
-        sem_wait(&full); // Se vazio, bloqueia ("dorme")
-        pthread_mutex_lock(&mutex_buffer); // Entra RC
+        // Lê os dados sem nenhum controle de concorrência (Leitura Suja)
+        int a = contaA;
+        int b = contaB;
+        int total = a + b;
         
-        int item = buffer[out];
-        buffer[out] = 0; // Limpa para visualização
-        out = (out + 1) % TAM_BUFFER;
+        if (total != 1000) {
+            printf("\n---> [ALERTA LEITURA SUJA - Leitor %d] Total inconsistente! ContaA: %d, ContaB: %d, Total: %d\n\n", id, a, b, total);
+        } else {
+            printf("[Leitor %d] Leitura limpa. Total: %d\n", id, total);
+        }
         
-        printf("[Consumidor %d] Entrou na RC. Consumiu o item %d.\n", id, item);
-        imprimir_buffer();
-        printf("[Consumidor %d] Saiu da RC.\n", id);
-        
-        pthread_mutex_unlock(&mutex_buffer); // Sai RC
-        sem_post(&empty); // Avisa que liberou vaga
-        
-        sleep(1); // Consumidor mais lento
+        usleep(50000); // Lê com mais frequência
     }
+    printf("[Leitor %d] Finalizado.\n", id);
     pthread_exit(NULL);
 }
 
 int main() {
-    pthread_t prods[NUM_PRODUTORES], cons[NUM_CONSUMIDORES];
-    int id_prods[NUM_PRODUTORES], id_cons[NUM_CONSUMIDORES];
+    pthread_t leitores[NUM_LEITORES], escritores[NUM_ESCRITORES];
+    int id_leitores[NUM_LEITORES], id_escritores[NUM_ESCRITORES];
 
-    // Inicialização
-    for(int i=0; i<TAM_BUFFER; i++) buffer[i] = 0;
-    sem_init(&empty, 0, TAM_BUFFER);
-    sem_init(&full, 0, 0);
-    pthread_mutex_init(&mutex_buffer, NULL);
+    srand(time(NULL));
+    pthread_mutex_init(&mutex_escrita, NULL);
 
-    // Criação de threads
-    id_cons[0] = 1;
-    pthread_create(&cons[0], NULL, consumidor, &id_cons[0]);
+    printf("Sistema Bancario Iniciado. Saldo Total Inicial: %d\n\n", contaA + contaB);
 
-    for (int i = 0; i < NUM_PRODUTORES; i++) {
-        id_prods[i] = i + 1;
-        pthread_create(&prods[i], NULL, produtor, &id_prods[i]);
+    for (int i = 0; i < NUM_ESCRITORES; i++) {
+        id_escritores[i] = i + 1;
+        pthread_create(&escritores[i], NULL, escritor, &id_escritores[i]);
+    }
+    for (int i = 0; i < NUM_LEITORES; i++) {
+        id_leitores[i] = i + 1;
+        pthread_create(&leitores[i], NULL, leitor, &id_leitores[i]);
     }
 
-    // Join
-    for (int i = 0; i < NUM_PRODUTORES; i++) pthread_join(prods[i], NULL);
-    pthread_join(cons[0], NULL);
+    for (int i = 0; i < NUM_ESCRITORES; i++) pthread_join(escritores[i], NULL);
+    for (int i = 0; i < NUM_LEITORES; i++) pthread_join(leitores[i], NULL);
 
+    pthread_mutex_destroy(&mutex_escrita);
+    printf("\nProcessamento concluido.\n");
     return 0;
 }

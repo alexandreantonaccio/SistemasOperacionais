@@ -19,7 +19,7 @@ int buffer[TAM_BUFFER];
 int in = 0, out = 0;
 
 void imprimir_buffer() {
-    printf("BUFFER CAÓTICO: [ ");
+    printf("BUFFER: [ ");
     for(int i=0; i<TAM_BUFFER; i++) {
         printf("%d ", buffer[i]);
     }
@@ -48,7 +48,7 @@ void* consumidor(void* arg) {
     int id = *((int*)arg);
     for (int i = 0; i < ITENS_POR_PRODUTOR; i++) {
         
-        // Consumindo sem verificar se está vazio. Vai ler lixo (zeros antigos ou lixo de memória)!
+        // Consumindo sem verificar se está vazio.
         int temp_out = out;
         usleep(20000); // Pausa para forçar conflito no ponteiro out
         int item = buffer[temp_out];
@@ -69,7 +69,6 @@ int main() {
     for(int i=0; i<TAM_BUFFER; i++) buffer[i] = 0;
 
     printf("Iniciando Produtor/Consumidor SEM CONTROLE.\n");
-    printf("Observe mensagens de erro e valores zerados sendo consumidos.\n\n");
 
     for (int i = 0; i < NUM_PRODUTORES; i++) {
         ids[i] = i + 1;

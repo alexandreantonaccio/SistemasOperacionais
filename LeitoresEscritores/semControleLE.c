@@ -23,11 +23,9 @@ void* escritor(void* arg) {
         
         printf("[Escritor %d] Transferindo %d (SEM RC)...\n", id, valor);
         
-        // Simulação de race condition severa na atualização
         int tempA = contaA;
         usleep(rand() % 50000); // Dorme para aumentar chance de colisão
         contaA = tempA - valor;
-        
         int tempB = contaB;
         usleep(rand() % 50000);
         contaB = tempB + valor;
@@ -52,7 +50,7 @@ int main() {
     pthread_t leitores[NUM_LEITORES], escritores[NUM_ESCRITORES];
     int ids[10];
 
-    printf("Iniciando sem controle. Saldo deve ser 1000. Prepare-se para o caos.\n\n");
+    printf("Sistema Bancario Iniciado. Saldo Total Inicial: 1000.\n\n");
 
     for (int i = 0; i < NUM_ESCRITORES; i++) {
         ids[i] = i + 1;

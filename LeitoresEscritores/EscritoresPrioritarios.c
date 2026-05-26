@@ -72,7 +72,8 @@ void* leitor(void* arg) {
         
         // Região Crítica (Leitura Limpa garantida)
         int total = contaA + contaB;
-        printf("[Leitor %d] Lendo na RC. Total na conta: %d\n", id, total);
+        printf("[Leitor %d] Lendo na RC. Total na conta: %d\n", id, total);        printf("[Leitor %d] Detalhes -> ContaA: %d, ContaB: %d\n", id, contaA, contaB);
+
         usleep(50000);
         
         // Protocolo de Saída - Leitor
@@ -90,6 +91,7 @@ void* leitor(void* arg) {
 int main() {
     pthread_t leitores[NUM_LEITORES], escritores[NUM_ESCRITORES];
     int id_leitores[NUM_LEITORES], id_escritores[NUM_ESCRITORES];
+    printf("Sistema Bancario Iniciado. Saldo Total Inicial: 1000.\n\n");
 
     pthread_mutex_init(&rmutex, NULL);
     pthread_mutex_init(&wmutex, NULL);

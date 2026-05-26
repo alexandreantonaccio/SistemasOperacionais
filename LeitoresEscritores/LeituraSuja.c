@@ -30,9 +30,9 @@ void* escritor(void* arg) {
         pthread_mutex_lock(&mutex_escrita); // Entra na Região Crítica
         printf("[Escritor %d] Entrou na RC. Iniciando transferencia de %d da Conta A para B.\n", id, valor);
         
-        // Simula uma operação demorada para forçar a leitura suja
+        // operacao demorada para forcar a leitura suja
         contaA -= valor;
-        usleep(100000); // Dorme por 100ms. AQUI OCORRE A INCONSISTÊNCIA!
+        usleep(100000); 
         contaB += valor;
         
         printf("[Escritor %d] Transferencia concluida. (ContaA: %d, ContaB: %d, Total: %d). Saindo da RC.\n", 
@@ -56,7 +56,7 @@ void* leitor(void* arg) {
         int total = a + b;
         
         if (total != 1000) {
-            printf("\n---> [ALERTA LEITURA SUJA - Leitor %d] Total inconsistente! ContaA: %d, ContaB: %d, Total: %d\n\n", id, a, b, total);
+            printf("\n---> [LEITURA SUJA - Leitor %d] Total inconsistente! Total lido: %d\n\n", id, total);
         } else {
             printf("[Leitor %d] Leitura limpa. Total: %d\n", id, total);
         }
